@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Turbo Drift: Rival Racers</title>
+    <style>
+        /* --- CSS STYLING --- */
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #87CEEB; /* Sky fallback */
+            user-select: none;
+        }
+
+        /* HUD (Heads Up Display) */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-panel {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            color: #fff;
+            padding: 10px 25px;
+            border-radius: 8px;
+            border-bottom: 4px solid #ff4757;
+            text-transform: uppercase;
+            font-weight: 800;
+            font-size: 1.1rem;
+            transform: skew(-10deg);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .hud-value {
+            color: #2ed573;
+            font-size: 1.4rem;
+            margin-left: 8px;
+        }
+
+        /* GAME OVER SCREEN */
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px 60px;
+            text-align: center;
+            border-radius: 15px;
+            display: none; /* Hidden by default */
+            z-index: 20;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border: 4px solid #2f3542;
+        }
+
+        h1 { margin: 0 0 15px 0; font-size: 3.5rem; color: #ff4757; font-style: italic; text-shadow: 2px 2px 0px #2f3542; }
+        p { font-size: 1.5rem; color: #57606f; margin-bottom: 30px; font-weight: bold; }
+        
+        button {
+            padding: 15px 50px;
+            font-size: 1.3rem;
+            background: #2ed573;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            color: #fff;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: transform 0.1s, background 0.2s;
+            box-shadow: 0 6px 0 #218c74;
+        }
+
+        button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #218c74;
+        }
+        button:hover { background: #26af61; }
+
+        /* CONTROLS HINT */
+        #controls-hint {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            opacity: 0.8;
+        }
+
+        /* MOBILE TOUCH ZONES */
+        .touch-zone { position: absolute; top: 0; height: 100%; width: 50%; z-index: 5; }
+        #touch-left { left: 0; }
+        #touch-right { right: 0; }
+
+    </style>
+</head>
+<body>
+
+    <div id="hud">
+        <div class="hud-panel">Score <span id="score" class="hud-value">0</span></div>
+        <div class="hud-panel">Speed <span id="speed" class="hud-value">0</span> km/h</div>
+    </div>
+
+    <div id="game-over">
+        <h1>CRASHED!</h1>
+        <p>You hit a rival racer!</p>
+        <p>Score: <span id="final-score" style="color:#2f3542">0</span></p>
+        <button onclick="resetGame()">Try Again</button>
+    </div>
+
+    <div id="touch-left" class="touch-zone"></div>
+    <div id="touch-right" class="touch-zone"></div>
+    <div id="controls-hint">Use [ARROWS] or [A/D] to Dodge Rivals</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- CONFIGURATION ---
+        const CONFIG = {
+            roadWidth: 14,
+            laneWidth: 4,
+            baseSpeed: 0.6,
+            maxSpeed: 1.8,
+            acceleration: 0.0001,
+            turnSpeed: 0.18,
+            cameraHeight: 5,
+            cameraDistance: 9,
+            colors: {
+                sky: 0x87CEEB,
+                grass: 0x4CAF50,
+                road: 0x333333,
+                player: 0xff4757, // Red
+                enemy1: 0xffa502, // Orange
+                enemy2: 0x1e90ff  // Blue
+            }
+        };
+
+        // --- GLOBALS ---
+        let scene, camera, renderer;
+        let playerCar, roadMesh;
+        let obstacles = []; // This will now hold enemy cars
+        let score = 0;
+        let speed = CONFIG.baseSpeed;
+        let gameActive = true;
+        let clock = new THREE.Clock();
+        
+        // Input State
+        const keys = { left: false, right: false };
+
+        // --- 1. SETUP & INITIALIZATION ---
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(CONFIG.colors.sky);
+            // Add fog for depth perception and speed illusion
+            scene.fog = new THREE.Fog(CONFIG.colors.sky, 20, 90); 
+
+            // Camera (Third Person)
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+            camera.position.set(0, CONFIG.cameraHeight, CONFIG.cameraDistance);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting
+            setupLighting();
+
+            // World Building
+            createRoad();
+            createPlayerCar();
+
+            // Event Listeners
+            window.addEventListener('resize', onResize);
+            document.addEventListener('keydown', (e) => handleKey(e, true));
+            document.addEventListener('keyup', (e) => handleKey(e, false));
+            
+            // Touch Listeners
+            const tLeft = document.getElementById('touch-left');
+            const tRight = document.getElementById('touch-right');
+            tLeft.addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+            tLeft.addEventListener('touchend', (e) => { e.preventDefault(); keys.left = false; });
+            tRight.addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+            tRight.addEventListener('touchend', (e) => { e.preventDefault(); keys.right = false; });
+
+            // Start Game Loop
+            update();
+        }
+
+        function setupLighting() {
+            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambient);
+
+            const sun = new THREE.DirectionalLight(0xffffff, 1);
+            sun.position.set(20, 50, 20);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048;
+            sun.shadow.mapSize.height = 2048;
+            sun.shadow.camera.near = 0.5;
+            sun.shadow.camera.far = 100;
+            sun.shadow.camera.left = -20;
+            sun.shadow.camera.right = 20;
+            sun.shadow.camera.top = 20;
+            sun.shadow.camera.bottom = -20;
+            scene.add(sun);
+        }
+
+        // --- 2. ASSET GENERATION (PROCEDURAL) ---
+
+        // Helper to build a car mesh (used for player and enemies)
+        function buildCarMesh(color) {
+            const carGroup = new THREE.Group();
+
+            // Chassis
+            const bodyGeo = new THREE.BoxGeometry(1.8, 0.6, 3.8);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.5 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.6;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            carGroup.add(body);
+
+            // Cabin (Top)
+            const cabinGeo = new THREE.BoxGeometry(1.4, 0.5, 2.2);
+            const cabinMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.1 }); // Dark glass
+            const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+            cabin.position.set(0, 1.15, -0.2);
+            cabin.castShadow = true;
+            carGroup.add(cabin);
+
+            // Wheels
+            const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.3, 16);
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+            const wheelPos = [
+                {x:-1, z:1.2}, {x:1, z:1.2},   // Front
+                {x:-1, z:-1.2}, {x:1, z:-1.2}  // Rear
+            ];
+            wheelPos.forEach(p => {
+                const w = new THREE.Mesh(wheelGeo, wheelMat);
+                w.rotation.z = Math.PI / 2;
+                w.position.set(p.x, 0.35, p.z);
+                w.castShadow = true;
+                carGroup.add(w);
+            });
+
+            return carGroup;
+        }
+
+        function createPlayerCar() {
+            playerCar = buildCarMesh(CONFIG.colors.player);
+            
+            // Add headlights for player only (optional flair)
+            const lightGeo = new THREE.BoxGeometry(0.4, 0.2, 0.1);
+            const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+            const leftLight = new THREE.Mesh(lightGeo, lightMat);
+            leftLight.position.set(-0.6, 0.7, -1.91);
+            playerCar.add(leftLight);
+            const rightLight = new THREE.Mesh(lightGeo, lightMat);
+            rightLight.position.set(0.6, 0.7, -1.91);
+            playerCar.add(rightLight);
+
+            scene.add(playerCar);
+        }
+
+        function createRoad() {
+            // Texture generation
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Asphalt
+            ctx.fillStyle = "#3a3a3a";
+            ctx.fillRect(0,0,512,512);
+            // Noise
+            for(let i=0; i<3000; i++) {
+                ctx.fillStyle = Math.random()>0.5?"#444":"#333";
+                ctx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
+            }
+            // Lanes
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(250, 0, 12, 512); // Center line
+            ctx.fillStyle = "#ffcc00";
+            ctx.fillRect(10, 0, 15, 512); // Left edge
+            ctx.fillRect(487, 0, 15, 512); // Right edge
+
+            const roadTex = new THREE.CanvasTexture(canvas);
+            roadTex.wrapS = THREE.RepeatWrapping;
+            roadTex.wrapT = THREE.RepeatWrapping;
+            roadTex.repeat.set(1, 5);
+
+            // Road Plane
+            const geometry = new THREE.PlaneGeometry(CONFIG.roadWidth, 1000);
+            const material = new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.8 });
+            roadMesh = new THREE.Mesh(geometry, material);
+            roadMesh.rotation.x = -Math.PI / 2;
+            roadMesh.receiveShadow = true;
+            scene.add(roadMesh);
+
+            // Grass Planes
+            const grassGeo = new THREE.PlaneGeometry(200, 1000);
+            const grassMat = new THREE.MeshBasicMaterial({ color: CONFIG.colors.grass });
+            
+            const grassL = new THREE.Mesh(grassGeo, grassMat);
+            grassL.rotation.x = -Math.PI/2;
+            grassL.position.set(-107, -0.1, 0);
+            scene.add(grassL);
+
+            const grassR = new THREE.Mesh(grassGeo, grassMat);
+            grassR.rotation.x = -Math.PI/2;
+            grassR.position.set(107, -0.1, 0);
+            scene.add(grassR);
+        }
+
+        // --- 3. LOGIC & GAMEPLAY ---
+
+        function handleKey(e, isPressed) {
+            if(e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keys.left = isPressed;
+            if(e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keys.right = isPressed;
+        }
+
+        function spawnEnemyCar() {
+            // Randomly choose color
+            const color = Math.random() > 0.5 ? CONFIG.colors.enemy1 : CONFIG.colors.enemy2;
+            const enemy = buildCarMesh(color);
+
+            // Random Lane (-4, 0, 4 are roughly the 3 lanes)
+            const lanes = [-4, 0, 4];
+            const lane = lanes[Math.floor(Math.random() * lanes.length)];
+            
+            enemy.position.set(lane, 0, -100); // Spawn far ahead
+            // Rotate 180 to face player if we want them driving towards us, 
+            // OR keep 0 if we want to overtake them. 
+            // Classic arcade style: they drive same direction but slower OR static. 
+            // Let's make them drive TOWARDS player for higher difficulty (Chicken run style)
+            // or Same direction but slower. Let's do SAME direction but slower (Overtaking).
+            
+            // Actually, prompt asked for "obstacles... move toward player".
+            // So we treat them like slow cars we are passing really fast.
+            
+            enemy.userData = {
+                box: new THREE.Box3(),
+                speedOffset: (Math.random() * 0.2) // Slight speed variation
+            };
+
+            scene.add(enemy);
+            obstacles.push(enemy);
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            const dt = clock.getDelta();
+
+            // 1. Acceleration
+            if(speed < CONFIG.maxSpeed) speed += CONFIG.acceleration;
+
+            // 2. Road Scrolling (Illusion of speed)
+            roadMesh.material.map.offset.y -= speed * 0.5 * dt;
+
+            // 3. Player Steering
+            if(keys.left) {
+                playerCar.position.x -= CONFIG.turnSpeed;
+                playerCar.rotation.y = 0.15; // Turn visual
+                playerCar.rotation.z = 0.05; // Body roll
+            } else if (keys.right) {
+                playerCar.position.x += CONFIG.turnSpeed;
+                playerCar.rotation.y = -0.15;
+                playerCar.rotation.z = -0.05;
+            } else {
+                playerCar.rotation.y = THREE.MathUtils.lerp(playerCar.rotation.y, 0, 0.1);
+                playerCar.rotation.z = THREE.MathUtils.lerp(playerCar.rotation.z, 0, 0.1);
+            }
+            // Keep on road
+            playerCar.position.x = THREE.MathUtils.clamp(playerCar.position.x, -6, 6);
+
+            // 4. Enemy Management
+            // Spawn logic
+            if(Math.random() < 0.02 * speed) spawnEnemyCar();
+
+            const playerBox = new THREE.Box3().setFromObject(playerCar);
+            playerBox.expandByScalar(-0.4); // Forgiving hit box
+
+            for(let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                
+                // Move logic: Objects move +Z (towards camera) relative to player
+                // simulating player moving -Z very fast.
+                obs.position.z += (speed * 40) * dt; 
+
+                // Simple lane weave for enemies (Bonus AI)
+                // obs.position.x += Math.sin(Date.now()*0.001 + i)*0.02;
+
+                // Collision Check
+                obs.userData.box.setFromObject(obs);
+                if(playerBox.intersectsBox(obs.userData.box)) {
+                    gameOver();
+                }
+
+                // Cleanup
+                if(obs.position.z > 20) {
+                    scene.remove(obs);
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // 5. Camera Follow (Lerp)
+            camera.position.x = THREE.MathUtils.lerp(camera.position.x, playerCar.position.x * 0.5, 0.1);
+            
+            // Speed Shake
+            if(speed > 1.2) {
+                camera.position.y = CONFIG.cameraHeight + (Math.random() * 0.05);
+            } else {
+                camera.position.y = CONFIG.cameraHeight;
+            }
+
+            // 6. UI
+            score += Math.round(speed * 2);
+            document.getElementById('score').innerText = score;
+            document.getElementById('speed').innerText = Math.floor(speed * 180);
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(update);
+        }
+
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('game-over').style.display = 'block';
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('hud').style.display = 'none';
+        }
+
+        window.resetGame = function() {
+            gameActive = true;
+            score = 0;
+            speed = CONFIG.baseSpeed;
+            playerCar.position.x = 0;
+            
+            // Clear enemies
+            obstacles.forEach(o => scene.remove(o));
+            obstacles = [];
+
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('hud').style.display = 'flex';
+            
+            clock.getDelta(); // reset clock
+            update();
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Run
+        init();
+
+    </script>
+</body>
+</html>
