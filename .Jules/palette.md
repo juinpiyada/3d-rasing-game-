@@ -1,0 +1,3 @@
+## 2024-03-24 - Canvas Game Modals
+**Learning:** Game over screens overlaying canvas games are technically modal dialogs but are rarely marked up as such, breaking screen reader context. Focus management when they appear is crucial for keyboard-only restart flows.
+**Action:** Always add `role="dialog"` and `aria-modal="true"` to HTML overlays in canvas games, and auto-focus the primary action button (like "Restart") when the overlay appears.
