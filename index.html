@@ -87,6 +87,7 @@
             box-shadow: 0 2px 0 #218c74;
         }
         button:hover { background: #26af61; }
+        button:focus-visible { outline: 3px solid #2f3542; outline-offset: 4px; }
 
         /* CONTROLS HINT */
         #controls-hint {
@@ -116,11 +117,11 @@
         <div class="hud-panel">Speed <span id="speed" class="hud-value">0</span> km/h</div>
     </div>
 
-    <div id="game-over">
+    <div id="game-over" role="alert" aria-live="assertive">
         <h1>CRASHED!</h1>
         <p>You hit a rival racer!</p>
         <p>Score: <span id="final-score" style="color:#2f3542">0</span></p>
-        <button onclick="resetGame()">Try Again</button>
+        <button id="try-again-btn" onclick="resetGame()">Try Again</button>
     </div>
 
     <div id="touch-left" class="touch-zone"></div>
@@ -455,6 +456,7 @@
             document.getElementById('game-over').style.display = 'block';
             document.getElementById('final-score').innerText = score;
             document.getElementById('hud').style.display = 'none';
+            document.getElementById('try-again-btn').focus();
         }
 
         window.resetGame = function() {
