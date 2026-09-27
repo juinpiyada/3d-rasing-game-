@@ -1,0 +1,3 @@
+## 2024-09-27 - Managing Focus for Primary Recovery Actions in Canvas Games
+**Learning:** In canvas-based web games where the user interacts primarily with the keyboard (e.g. arrow keys for steering), any interruption of gameplay (like a game-over screen overlay) can break keyboard navigation if focus isn't managed. Users expect to recover or try again quickly without switching to a mouse.
+**Action:** When displaying state-change overlays (like game-over or pause menus) that require user action to dismiss, automatically move browser focus to the primary recovery action element (e.g., the "Try Again" `<button>`). Ensure this button has clear `:focus-visible` styling so the user knows they can simply press Space or Enter to continue.

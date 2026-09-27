@@ -87,6 +87,7 @@
             box-shadow: 0 2px 0 #218c74;
         }
         button:hover { background: #26af61; }
+        button:focus-visible { outline: 3px solid #2f3542; outline-offset: 4px; }
 
         /* CONTROLS HINT */
         #controls-hint {
@@ -123,8 +124,8 @@
         <button onclick="resetGame()">Try Again</button>
     </div>
 
-    <div id="touch-left" class="touch-zone"></div>
-    <div id="touch-right" class="touch-zone"></div>
+    <div id="touch-left" class="touch-zone" aria-hidden="true"></div>
+    <div id="touch-right" class="touch-zone" aria-hidden="true"></div>
     <div id="controls-hint">Use [ARROWS] or [A/D] to Dodge Rivals</div>
 
     <script type="importmap">
@@ -455,6 +456,7 @@
             document.getElementById('game-over').style.display = 'block';
             document.getElementById('final-score').innerText = score;
             document.getElementById('hud').style.display = 'none';
+            document.querySelector('#game-over button').focus();
         }
 
         window.resetGame = function() {
