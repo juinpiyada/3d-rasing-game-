@@ -87,6 +87,10 @@
             box-shadow: 0 2px 0 #218c74;
         }
         button:hover { background: #26af61; }
+        button:focus-visible {
+            outline: 3px solid #1e90ff;
+            outline-offset: 4px;
+        }
 
         /* CONTROLS HINT */
         #controls-hint {
@@ -455,6 +459,7 @@
             document.getElementById('game-over').style.display = 'block';
             document.getElementById('final-score').innerText = score;
             document.getElementById('hud').style.display = 'none';
+            document.querySelector('#game-over button').focus();
         }
 
         window.resetGame = function() {
@@ -469,6 +474,7 @@
 
             document.getElementById('game-over').style.display = 'none';
             document.getElementById('hud').style.display = 'flex';
+            document.querySelector('#game-over button').blur();
             
             clock.getDelta(); // reset clock
             update();
