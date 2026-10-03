@@ -1,0 +1,3 @@
+## 2026-10-03 - [Auto-Focus Keyboard Continuity in Modals]
+**Learning:** For in-game custom modals (like game over screens), if you do not explicitly transfer focus to an actionable element (e.g., "Try Again" button), keyboard users lose navigation continuity and must re-orient or use the mouse.
+**Action:** Always auto-focus the primary interactive element inside custom modal dialogs upon their appearance to ensure seamless keyboard continuity.
