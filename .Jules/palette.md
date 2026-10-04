@@ -1,0 +1,3 @@
+## 2024-10-04 - Auto-Focus Primary Actions in Canvas/Game Overlays
+**Learning:** For keyboard-first games where play is driven by arrow keys/space, suddenly requiring the user to tab through an overlay to find the "Try Again" button creates friction. If an overlay appears after a failure state (like a crash), auto-focusing the primary action is crucial for a seamless retry loop.
+**Action:** When implementing game over or pause overlays, ensure the primary action button (e.g. Restart, Continue) is explicitly `.focus()`ed when the overlay is displayed. Additionally add `role="alert"` and `aria-live="assertive"` so screen readers immediately announce the failure state.

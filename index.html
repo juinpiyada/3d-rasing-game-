@@ -66,7 +66,7 @@
 
         h1 { margin: 0 0 15px 0; font-size: 3.5rem; color: #ff4757; font-style: italic; text-shadow: 2px 2px 0px #2f3542; }
         p { font-size: 1.5rem; color: #57606f; margin-bottom: 30px; font-weight: bold; }
-        
+
         button {
             padding: 15px 50px;
             font-size: 1.3rem;
@@ -116,11 +116,11 @@
         <div class="hud-panel">Speed <span id="speed" class="hud-value">0</span> km/h</div>
     </div>
 
-    <div id="game-over">
+    <div id="game-over" role="alert" aria-live="assertive">
         <h1>CRASHED!</h1>
         <p>You hit a rival racer!</p>
         <p>Score: <span id="final-score" style="color:#2f3542">0</span></p>
-        <button onclick="resetGame()">Try Again</button>
+        <button id="restart-btn" onclick="resetGame()">Try Again</button>
     </div>
 
     <div id="touch-left" class="touch-zone"></div>
@@ -167,7 +167,7 @@
         let speed = CONFIG.baseSpeed;
         let gameActive = true;
         let clock = new THREE.Clock();
-        
+
         // Input State
         const keys = { left: false, right: false };
 
@@ -177,7 +177,7 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(CONFIG.colors.sky);
             // Add fog for depth perception and speed illusion
-            scene.fog = new THREE.Fog(CONFIG.colors.sky, 20, 90); 
+            scene.fog = new THREE.Fog(CONFIG.colors.sky, 20, 90);
 
             // Camera (Third Person)
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
@@ -201,7 +201,7 @@
             window.addEventListener('resize', onResize);
             document.addEventListener('keydown', (e) => handleKey(e, true));
             document.addEventListener('keyup', (e) => handleKey(e, false));
-            
+
             // Touch Listeners
             const tLeft = document.getElementById('touch-left');
             const tRight = document.getElementById('touch-right');
@@ -275,7 +275,7 @@
 
         function createPlayerCar() {
             playerCar = buildCarMesh(CONFIG.colors.player);
-            
+
             // Add headlights for player only (optional flair)
             const lightGeo = new THREE.BoxGeometry(0.4, 0.2, 0.1);
             const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
@@ -295,7 +295,7 @@
             canvas.width = 512;
             canvas.height = 512;
             const ctx = canvas.getContext('2d');
-            
+
             // Asphalt
             ctx.fillStyle = "#3a3a3a";
             ctx.fillRect(0,0,512,512);
@@ -327,7 +327,7 @@
             // Grass Planes
             const grassGeo = new THREE.PlaneGeometry(200, 1000);
             const grassMat = new THREE.MeshBasicMaterial({ color: CONFIG.colors.grass });
-            
+
             const grassL = new THREE.Mesh(grassGeo, grassMat);
             grassL.rotation.x = -Math.PI/2;
             grassL.position.set(-107, -0.1, 0);
@@ -354,17 +354,17 @@
             // Random Lane (-4, 0, 4 are roughly the 3 lanes)
             const lanes = [-4, 0, 4];
             const lane = lanes[Math.floor(Math.random() * lanes.length)];
-            
+
             enemy.position.set(lane, 0, -100); // Spawn far ahead
-            // Rotate 180 to face player if we want them driving towards us, 
-            // OR keep 0 if we want to overtake them. 
-            // Classic arcade style: they drive same direction but slower OR static. 
+            // Rotate 180 to face player if we want them driving towards us,
+            // OR keep 0 if we want to overtake them.
+            // Classic arcade style: they drive same direction but slower OR static.
             // Let's make them drive TOWARDS player for higher difficulty (Chicken run style)
             // or Same direction but slower. Let's do SAME direction but slower (Overtaking).
-            
+
             // Actually, prompt asked for "obstacles... move toward player".
             // So we treat them like slow cars we are passing really fast.
-            
+
             enemy.userData = {
                 box: new THREE.Box3(),
                 speedOffset: (Math.random() * 0.2) // Slight speed variation
@@ -410,10 +410,10 @@
 
             for(let i = obstacles.length - 1; i >= 0; i--) {
                 const obs = obstacles[i];
-                
+
                 // Move logic: Objects move +Z (towards camera) relative to player
                 // simulating player moving -Z very fast.
-                obs.position.z += (speed * 40) * dt; 
+                obs.position.z += (speed * 40) * dt;
 
                 // Simple lane weave for enemies (Bonus AI)
                 // obs.position.x += Math.sin(Date.now()*0.001 + i)*0.02;
@@ -433,7 +433,7 @@
 
             // 5. Camera Follow (Lerp)
             camera.position.x = THREE.MathUtils.lerp(camera.position.x, playerCar.position.x * 0.5, 0.1);
-            
+
             // Speed Shake
             if(speed > 1.2) {
                 camera.position.y = CONFIG.cameraHeight + (Math.random() * 0.05);
@@ -455,6 +455,7 @@
             document.getElementById('game-over').style.display = 'block';
             document.getElementById('final-score').innerText = score;
             document.getElementById('hud').style.display = 'none';
+            document.getElementById('restart-btn').focus();
         }
 
         window.resetGame = function() {
@@ -462,14 +463,14 @@
             score = 0;
             speed = CONFIG.baseSpeed;
             playerCar.position.x = 0;
-            
+
             // Clear enemies
             obstacles.forEach(o => scene.remove(o));
             obstacles = [];
 
             document.getElementById('game-over').style.display = 'none';
             document.getElementById('hud').style.display = 'flex';
-            
+
             clock.getDelta(); // reset clock
             update();
         }
